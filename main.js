@@ -6,6 +6,13 @@ async function init() {
     let currentGuess = '';
     let currentRow = 0;
 
+
+    const res = await fetch("https://words.dev-apis.com/word-of-the-day") //put ?random=1 to get a new word every single page refresh
+    const resObj = await res.json();
+    const word = resObj.word.toUpperCase();
+    setLoading(false);
+    
+
     /*This function puts the letters inside the game squares. 
     If the current guess length is already 5 it will replace the last letter of the 5 letter word with whatever the user types*/
     
@@ -58,6 +65,10 @@ async function init() {
 
 function isLetter(letter) {
     return /^[a-zA-Z]$/.test(letter);
+}
+
+function setLoading(isLoading) {
+    loading.classList.toggle('hidden', !isLoading);
 }
 
 init();
