@@ -1,3 +1,4 @@
+const ROUNDS = 6;
 const letters = document.querySelectorAll('.scoreboard-letter');
 const loading = document.querySelector('.info-bar');
 const ANSWER_LENGTH = 5; //Stays the same all the time, hence the screaming case.. 
@@ -5,13 +6,15 @@ const ANSWER_LENGTH = 5; //Stays the same all the time, hence the screaming case
 async function init() {
     let currentGuess = '';
     let currentRow = 0;
-
+    let done = false;
+    let isLoading = true;
 
     const res = await fetch("https://words.dev-apis.com/word-of-the-day") //put ?random=1 to get a new word every single page refresh
     const resObj = await res.json();
     const word = resObj.word.toUpperCase();
     const wordParts = word.split("");
-    setLoading(false);
+    isLoading = false;
+    setLoading(isLoading);
     
 
     /*This function puts the letters inside the game squares. 
@@ -26,7 +29,7 @@ async function init() {
             currentGuess = currentGuess.substring(0, currentGuess.length - 1) + letter;
         }
 
-        letters[ANSWER_LENGTH * currentRow + currentGuess.length - 1].innerText = letter;
+        letters[currentRow * ANSWER_LENGTH + currentGuess.length - 1].innerText = letter;
     }
 
     async function commit() {
@@ -34,9 +37,9 @@ async function init() {
             // do nothing
             return; 
         }
-        // TODO validate the word
+        // check the API to see if it's a valid word
         isLoading = true;
-        setLoading(true);
+        setLoading(isLoading);
         const res = await fetch("https://words.dev-apis.com/validate-word", {
             method: "POST",
             body: JSON.stringify({ word: currentGuess })
@@ -46,7 +49,7 @@ async function init() {
         const validWord = resObj.validWord;
 
         isLoading = false;
-        setLoading(false);
+        setLoading(isLoading);
 
         if (!validWord) {
             markInvalidWord();
@@ -55,7 +58,7 @@ async function init() {
 
         const guessParts = currentGuess.split("");
         const map = makeMap(wordParts);
-        
+        let allRight = true;
 
         for (let i = 0; i < ANSWER_LENGTH; i++) {
             // mark as correct
@@ -69,21 +72,24 @@ async function init() {
             // mark as close
             if (guessParts[i] === wordParts[i]) {
                 // do nothing, we already did it
-            } else if (wordParts.includes(guessParts[i]) && map[guessParts[i]] > 0 ) {
+            } else if (map[guessParts[i]]) && map[guessParts[i]] > 0 ) {
                 // mark as close
+                allRight = false;
                 letters[currentRow * ANSWER_LENGTH + i].classList.add("close");
                 map[guessParts[i]]--;
             } else {
+                //wrong
+                allRight = false;
                 letters[currentRow * ANSWER_LENGTH + i].classList.add("wrong");
             }
         }
 
-        // TODO did they win or lose?
-
         currentRow++;
-        if (currentGuess === word) {
-            document.querySelector('.brand').classList.add("winner")
+        currentGuess = "";
+        if (allRight) {
+            // user wins
             alert("you win!");
+            document.querySelector('.brand').classList.add("winner")
             done = true;
             return;
         } else if (currentRow === ROUNDS) {
@@ -93,16 +99,17 @@ async function init() {
         currentGuess = '';
     }
 
+    // functionality for when user hits backspace
     function backspace() {
         currentGuess = currentGuess.substring(0, currentGuess.length - 1);
-        letters[ANSWER_LENGTH * currentRow + currentGuess.length].innerText = "";
+        letters[currentRow * ANSWER_LENGTH + currentGuess.length].innerText = "";
     }
 
     function markInvalidWord() {
         alert('NOT A VALID WORD');
 
         for (let i = 0; i < ANSWER_LENGTH; i++) {
-            letters[currentRow * ANSWER_LENGTH + 1].classList.remove("invalid");
+            letters[currentRow * ANSWER_LENGTH + i].classList.remove("invalid");
 
             setTimeout(function () {
                 letters[currentRow * ANSWER_LENGTH + 1].classList.add("invalid");
@@ -111,6 +118,10 @@ async function init() {
     }
 
     document.addEventListener('keydown', function handleKeyPress (event) {
+        if (done || isLoading) {
+            //do nothing;
+            return;
+        }
         const action = event.key;
 
         if (action === 'Enter') {
@@ -134,17 +145,15 @@ function setLoading(isLoading) {
 }
 
 function makeMap(array) {
-    const obj = {};
-    for (let i = 0; i < array.length; i++) {
-        const letter = array[i];
-        if (obj[letter]) {
-            obj[letter]++;
-        } else {
-            obj[letter] = 1;
-        }
+  const obj = {};
+  for (let i = 0; i < array.length; i++) {
+    if (obj[array[i]]) {
+      obj[array[i]]++;
+    } else {
+      obj[array[i]] = 1;
     }
-
-    return obj;
+  }
+  return obj;
 }
 
 init();
