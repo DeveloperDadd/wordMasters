@@ -72,7 +72,7 @@ async function init() {
             // mark as close
             if (guessParts[i] === wordParts[i]) {
                 // do nothing, we already did it
-            } else if (map[guessParts[i]]) && map[guessParts[i]] > 0 ) {
+            } else if ((map[guessParts[i]]) && (map[guessParts[i]] > 0)) {
                 // mark as close
                 allRight = false;
                 letters[currentRow * ANSWER_LENGTH + i].classList.add("close");
