@@ -112,7 +112,7 @@ async function init() {
             letters[currentRow * ANSWER_LENGTH + i].classList.remove("invalid");
 
             setTimeout(function () {
-                letters[currentRow * ANSWER_LENGTH + 1].classList.add("invalid");
+                letters[currentRow * ANSWER_LENGTH + i].classList.add("invalid");
             }, 10);
         }
     }
