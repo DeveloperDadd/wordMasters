@@ -1,136 +1,159 @@
-// Set the number of rounds and the answer length
-const ROUNDS = 6;  // Number of rounds in the game
-const ANSWER_LENGTH = 5;  // Length of the word to guess
+const ANSWER_LENGTH = 5;
+const ROUNDS = 6;
+const letters = document.querySelectorAll(".scoreboard-letter");
+const loadingDiv = document.querySelector(".info-bar");
 
-// Select DOM elements
-const letters = document.querySelectorAll('.scoreboard-letter');  // Selects all elements with class 'scoreboard-letter'
-const loading = document.querySelector('.info-bar');  // Selects the element with class 'info-bar'
-
-// Initialize the game
 async function init() {
-    // Initialize variables
-    let currentGuess = '';  // Holds the current user's guess
-    let currentRow = 0;  // Tracks the current row of guesses
-    let done = false;  // Indicates if the game is finished
-    let isLoading = true;  // Indicates if data is currently being loaded
+  let currentRow = 0;
+  let currentGuess = "";
+  let done = false;
+  let isLoading = true;
 
-    // Fetch a word from an external API
-    const res = await fetch("https://words.dev-apis.com/word-of-the-day");  // API call to get the word of the day
-    const resObj = await res.json();  // Parse the API response as JSON
-    const word = resObj.word.toUpperCase();  // Convert the word to uppercase
-    const wordParts = word.split("");  // Split the word into an array of characters
-    isLoading = false;  // Data loading is complete
-    setLoading(isLoading);  // Toggle the loading UI
+  // get the word of the day
+  const res = await fetch("https://words.dev-apis.com/word-of-the-day");
+  const { word: wordRes } = await res.json();
+  const word = wordRes.toUpperCase();
+  const wordParts = word.split("");
+  isLoading = false;
+  setLoading(isLoading);
 
-    // Function to add a letter to the current guess
-    function addLetter(letter) {
-        if (currentGuess.length < ANSWER_LENGTH) {
-            // Add letter to the end
-            currentGuess += letter;
-        } else {
-            // Replace the last letter if the guess length is already 5
-            currentGuess = currentGuess.substring(0, currentGuess.length - 1) + letter;
-        }
-
-        letters[currentRow * ANSWER_LENGTH + currentGuess.length - 1].innerText = letter;
+  // user adds a letter to the current guess
+  function addLetter(letter) {
+    if (currentGuess.length < ANSWER_LENGTH) {
+      currentGuess += letter;
+    } else {
+      current = currentGuess.substring(0, currentGuess.length - 1) + letter;
     }
 
-    // Function to validate and process the current guess
-    async function commit() {
-        if (currentGuess.length !== ANSWER_LENGTH) {
-            // Do nothing if the guess length is not equal to the answer length
-            return;
-        }
+    letters[currentRow * ANSWER_LENGTH + currentGuess.length - 1].innerText =
+      letter;
+  }
 
-        isLoading = true;  // Set loading state
-        setLoading(isLoading);  // Toggle the loading UI
-
-        // Validate the current guess with an external API
-        const res = await fetch("https://words.dev-apis.com/validate-word", {
-            method: "POST",
-            body: JSON.stringify({ word: currentGuess })
-        });
-        
-        const resObj = await res.json();  // Parse the API response as JSON
-        const validWord = resObj.validWord;
-
-        isLoading = false;  // Reset loading state
-        setLoading(isLoading);  // Toggle the loading UI
-
-        // Process the guess and update the UI
-        if (!validWord) {
-            markInvalidWord();
-            return;
-        } 
-
-        // Check the correctness of the guess and update the UI
-        // ...
-
-        // Handle game outcomes
-        // ...
-
-        // Reset variables for the next round
-        currentRow++;
-        currentGuess = "";
-
-        // Handle win condition
-        // ...
+  // use tries to enter a guess
+  async function commit() {
+    if (currentGuess.length !== ANSWER_LENGTH) {
+      // do nothing
+      return;
     }
 
-    // Function to handle backspace
-    function backspace() {
-        // Remove the last letter from the current guess
-        currentGuess = currentGuess.substring(0, currentGuess.length - 1);
-        letters[currentRow * ANSWER_LENGTH + currentGuess.length].innerText = "";
-    }
-
-    // Function to mark an invalid word
-    function markInvalidWord() {
-        alert('NOT A VALID WORD');
-
-        // Add visual feedback for an invalid word
-        for (let i = 0; i < ANSWER_LENGTH; i++) {
-            letters[currentRow * ANSWER_LENGTH + i].classList.remove("invalid");
-
-            // Use a timeout for a brief visual effect
-            setTimeout(function () {
-                letters[currentRow * ANSWER_LENGTH + i].classList.add("invalid");
-            }, 10);
-        }
-    }
-
-    // Event listener for keyboard input
-    document.addEventListener('keydown', function handleKeyPress (event) {
-        if (done || isLoading) {
-            // Do nothing if the game is finished or loading
-            return;
-        }
-        const action = event.key;
-
-        // Perform actions based on keyboard input
-        if (action === 'Enter') {
-            commit();
-        } else if (action === 'Backspace') {
-            backspace();
-        } else if (isLetter(action)) {
-            addLetter(action.toUpperCase());
-        } else {
-            // Do nothing for other keys
-        }
+    // check the API to see if it's a valid word
+    isLoading = true;
+    setLoading(isLoading);
+    const res = await fetch("https://words.dev-apis.com/validate-word", {
+      method: "POST",
+      body: JSON.stringify({ word: currentGuess }),
     });
+    const { validWord } = await res.json();
+    isLoading = false;
+    setLoading(isLoading);
+
+    // not valid, mark the word as invalid and return
+    if (!validWord) {
+      markInvalidWord();
+      return;
+    }
+
+    const guessParts = currentGuess.split("");
+    const map = makeMap(wordParts);
+    let allRight = true;
+
+    // first pass just finds correct letters so we can mark those as
+    // correct first
+    for (let i = 0; i < ANSWER_LENGTH; i++) {
+      if (guessParts[i] === wordParts[i]) {
+        letters[currentRow * ANSWER_LENGTH + i].classList.add("correct");
+        map[guessParts[i]]--;
+      }
+    }
+
+    // second pass finds close and wrong letters
+    // we use the map to make sure we mark the correct amount of
+    // close letters
+    for (let i = 0; i < ANSWER_LENGTH; i++) {
+      if (guessParts[i] === wordParts[i]) {
+        // do nothing
+      } else if (map[guessParts[i]] && map[guessParts[i]] > 0) {
+        // mark as close
+        allRight = false;
+        letters[currentRow * ANSWER_LENGTH + i].classList.add("close");
+        map[guessParts[i]]--;
+      } else {
+        // wrong
+        allRight = false;
+        letters[currentRow * ANSWER_LENGTH + i].classList.add("wrong");
+      }
+    }
+
+    currentRow++;
+    currentGuess = "";
+    if (allRight) {
+      // win
+      alert("you win");
+      document.querySelector(".brand").classList.add("winner");
+      done = true;
+    } else if (currentRow === ROUNDS) {
+      // lose
+      alert(`you lose, the word was ${word}`);
+      done = true;
+    }
+  }
+
+  // user hits backspace, if the the length of the string is 0 then do nothing
+  function backspace() {
+    currentGuess = currentGuess.substring(0, currentGuess.length - 1);
+    letters[currentRow * ANSWER_LENGTH + currentGuess.length].innerText = "";
+  }
+
+  // let the user know that their guess wasn't a real word
+  // skip this if you're not doing guess validation
+  function markInvalidWord() {
+    for (let i = 0; i < ANSWER_LENGTH; i++) {
+      letters[currentRow * ANSWER_LENGTH + i].classList.remove("invalid");
+
+      // long enough for the browser to repaint without the "invalid class" so we can then add it again
+      setTimeout(
+        () => letters[currentRow * ANSWER_LENGTH + i].classList.add("invalid"),
+        10
+      );
+    }
+  }
+
+  document.addEventListener("keydown", function handleKeyPress(event) {
+    if (done || isLoading) {
+      // do nothing;
+      return;
+    }
+
+    const action = event.key;
+
+    if (action === "Enter") {
+      commit();
+    } else if (action === "Backspace") {
+      backspace();
+    } else if (isLetter(action)) {
+      addLetter(action.toUpperCase());
+    } else {
+      // do nothing
+    }
+  });
 }
 
-// Function to check if a character is a letter
+// a little function to check to see if a character is alphabet letter
+// this uses regex (the /[a-zA-Z]/ part) but don't worry about it
+// you can learn that later and don't need it too frequently
 function isLetter(letter) {
-    return /^[a-zA-Z]$/.test(letter);
+  return /^[a-zA-Z]$/.test(letter);
 }
 
-// Function to toggle loading UI
+// show the loading spinner when needed
 function setLoading(isLoading) {
-    loading.classList.toggle('hidden', !isLoading);
+  loadingDiv.classList.toggle("hidden", !isLoading);
 }
 
-// Function to create a frequency map of characters in an array
+// takes an array of letters (like ['E', 'L', 'I', 'T', 'E']) and creates
+// an object out of it (like {E: 2, L: 1, T: 1}) so we can use that to
+// make sure we get the correct amount of letters marked close instead
+// of just wrong or correct
 function makeMap(array) {
   const obj = {};
   for (let i = 0; i < array.length; i++) {
@@ -143,5 +166,4 @@ function makeMap(array) {
   return obj;
 }
 
-// Start the game
 init();
